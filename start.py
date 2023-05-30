@@ -23,14 +23,15 @@ Data Explorer
 
 import tensorflow as tf
 import tensorflow_addons as tfa
-import tensorflow_decision_forests as tfdf
+
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+import Support as sup
+
 #show versions of the APIs
-print("TensorFlow Decision Forests v" + tfdf.__version__)
 print("TensorFlow Addons v" + tfa.__version__)
 print("TensorFlow v" + tf.__version__)
 
@@ -58,9 +59,7 @@ dtypes={
     'level_group':'category'}
 
 
-
-
-dataset_df = pd.read_csv('/Data/train.csv', dtype=dtypes)
+dataset_df = pd.read_csv('Resources/train.csv', dtype=dtypes)
 print("Full train dataset shape is {}".format(dataset_df.shape))
 
 dataset_df.head(5)
