@@ -57,7 +57,10 @@ dtypes={
     'music':'category',
     'level_group':'category'}
 
-dataset_df = pd.read_csv('/kaggle/input/predict-student-performance-from-game-play/train.csv', dtype=dtypes)
+
+
+
+dataset_df = pd.read_csv('/Data/train.csv', dtype=dtypes)
 print("Full train dataset shape is {}".format(dataset_df.shape))
 
 dataset_df.head(5)
