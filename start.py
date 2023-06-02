@@ -23,14 +23,20 @@ Data Explorer
 
 import tensorflow as tf
 import tensorflow_addons as tfa
-import tensorflow_decision_forests as tfdf
+#import tensorflow_decision_forests as tfdf
 
 import pandas as pd
+from clean_df import CleanDataFrame
 import numpy as np
 import matplotlib.pyplot as plt
 
+import pandas as pd, numpy as np, gc
+from sklearn.model_selection import KFold, GroupKFold
+#from xgboost import XGBClassifier
+from sklearn.metrics import f1_score
+
 #show versions of the APIs
-print("TensorFlow Decision Forests v" + tfdf.__version__)
+#print("TensorFlow Decision Forests v" + tfdf.__version__)
 print("TensorFlow Addons v" + tfa.__version__)
 print("TensorFlow v" + tf.__version__)
 
@@ -57,10 +63,36 @@ dtypes={
     'music':'category',
     'level_group':'category'}
 
+y_dtypes={
+    'correct': 'category'}
 
 
 
-dataset_df = pd.read_csv('/Data/train.csv', dtype=dtypes)
+
+
+# Load the CSV file into a pandas DataFrame
+dataset_df = pd.read_csv('Data/train.csv', dtype=dtypes)
+dataset_y = pd.read_csv('Data/train_labels.csv', dtype=y_dtypes)
+dataset_df.info()
+dataset_y.info()
+
+# Print the original shape of the DataFrame
 print("Full train dataset shape is {}".format(dataset_df.shape))
 
-dataset_df.head(5)
+# Drop the 'level_group' column
+dataset_df = dataset_df.drop('level_group', axis=1)
+# Drop the 'index' column
+#dataset_df = dataset_df.drop('index', axis=1)
+
+# Reduces memory usage of the data
+cdf = CleanDataFrame(dataset_df, max_num_cat=20)
+cdf.clean(min_missing_ratio=1, drop_nan=False)
+cdf.optimize()
+cdf.df.info()
+dataset_y.info()
+
+# Print the new shape of the DataFrame
+print("New train dataset shape is {}".format(cdf.df.shape))
+dataset_df = cdf.df
+# Show the first 5 rows of the DataFrame
+print(dataset_df.head(5))
