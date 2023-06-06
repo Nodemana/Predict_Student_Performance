@@ -1,23 +1,15 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
-from sklearn.model_selection import KFold, GroupKFold
-from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import OrdinalEncoder
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import GroupKFold
+
 from sklearn.model_selection import train_test_split
 
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-from matplotlib import ticker
-import time
+from time import process_time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -28,7 +20,7 @@ from keras.layers import Dense
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
+from sklearn.utils import class_weight
 from sklearn.metrics import f1_score, ConfusionMatrixDisplay, classification_report, confusion_matrix
 
 import gc
@@ -120,6 +112,14 @@ train_label['session'] = train_label.session_id.apply(lambda x: int(x.split('_')
 train_label['q'] = train_label.session_id.apply(lambda x: int(x.split('_')[-1][1:]) )
 #print( 'shape of label dataset is:',train_label.shape )
 #print(train_label.head())
+# Plotting the class distribution of the 'correct' column
+plt.figure(figsize=(10, 6))
+sns.countplot(x='correct', data=train_label)
+plt.xlabel('Class',size=14)
+plt.ylabel('Count',size=14)
+plt.title('Class Distribution: Incorrect vs Correct', size=24)
+#plt.show()
+
 gc.collect()
 
 summary_table = summary(train_df)
@@ -146,13 +146,22 @@ gc.collect()
 
 
 def plot_history(history):
-    plt.figure(figsize=(10, 4))
-    plt.plot(history['loss'], label='Training Loss')
-    plt.plot(history['val_loss'], label='Validation Loss')
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
+    fig = plt.figure(figsize=[20, 6])
+    ax = fig.add_subplot(1, 2, 1)
+    plt.title("Loss vs Epochs", fontsize = 30)
+    plt.xlabel("Epochs",fontsize = 20)
+    plt.ylabel("Loss",fontsize = 20)
+    ax.plot(history['loss'], label="Training Loss")
+    ax.plot(history['val_loss'], label="Validation Loss")
+    ax.legend()
+
+    ax = fig.add_subplot(1, 2, 2)
+    plt.title("Accuracy vs Epochs", fontsize = 30)
+    plt.xlabel("Epochs",fontsize = 20)
+    plt.ylabel("Accuracy",fontsize = 20)
+    ax.plot(history['accuracy'], label="Training Accuracy")
+    ax.plot(history['val_accuracy'], label="Validation Accuracy")
+    ax.legend()
 
 # DEFINE THE NEURAL NETWORK MODEL
 def create_model(input_dim):
@@ -167,13 +176,7 @@ def create_model(input_dim):
     model.compile(loss='binary_crossentropy', optimizer=Adam(0.002), metrics=['accuracy'])
     return model
 
-from sklearn.metrics import accuracy_score, roc_auc_score
-
-
-def evaluate_model(model, X_test, y_test, threshold):
-    # Compute prediction probabilities
-    y_pred_prob = model.predict(X_test).flatten()
-
+def evaluate_model(y_pred_prob, y_test, threshold):
     # Compute predicted classes
     y_pred = (y_pred_prob > threshold).astype(int)
 
@@ -186,15 +189,14 @@ def evaluate_model(model, X_test, y_test, threshold):
     print('ROC AUC score:', auc)
 
     # Print confusion matrix
-    fig = plt.figure(figsize=[25, 8])
-    ax = fig.add_subplot(1, 2, 1)
     conf_matrix = confusion_matrix(y_test, y_pred)
-    ConfusionMatrixDisplay(conf_matrix).plot(ax=ax)
-    ax.set_title('Training Set Performance: %s' % (sum(y_pred == y_test)/len(y_test)))
+    ConfusionMatrixDisplay(conf_matrix).plot()
+    plt.title('Test Set Performance: %s' % (sum(y_pred == y_test)/len(y_test)))
 
     # Print classification report
     print('Classification Report:')
     print(classification_report(y_test, y_pred))
+
 #check data type
 #print(df_tr.dtypes)
 
@@ -228,9 +230,12 @@ for i, (train_index, test_index) in enumerate(gkf.split(X=df_tr, groups=df_tr.in
         # TRAIN DATA
         train_x = df_tr.iloc[train_index]
         train_x = train_x.loc[train_x.level_group == grp]
-        train_users = train_x.index.values
+        train_users = train_x.index.values      
         train_y = train_label.loc[train_label.q==t].set_index('session').loc[train_users]
-        
+        #print(train_y)
+        #class_weights = class_weight.compute_class_weight('balanced', np.unique(train_y.loc['correct']), train_y.loc['correct'])
+        #class_weights = dict(enumerate(class_weights))
+
         # VALID DATA
         valid_x = df_tr.iloc[test_index]
         valid_x = valid_x.loc[valid_x.level_group == grp]
@@ -241,11 +246,13 @@ for i, (train_index, test_index) in enumerate(gkf.split(X=df_tr, groups=df_tr.in
         scaler = StandardScaler()
         train_x_scaled = scaler.fit_transform(train_x[FEATURES].astype('float32'))
         valid_x_scaled = scaler.transform(valid_x[FEATURES].astype('float32'))
-        
+        class_weights = [0.7, 0.3]
+        class_weights_dict = dict(enumerate(class_weights))
+
         # TRAIN MODEL
         model = create_model(train_x_scaled.shape[1])
         early_stopping = EarlyStopping(monitor='val_loss', patience=10)
-        model.fit(train_x_scaled, train_y['correct'], validation_data=(valid_x_scaled, valid_y['correct']), epochs=100, callbacks=[early_stopping])
+        model.fit(train_x_scaled, train_y['correct'], validation_data=(valid_x_scaled, valid_y['correct']), epochs=100, callbacks=[early_stopping], class_weight=class_weights_dict)
         
         # SAVE MODEL, PREDICT VALID OOF
         models[f'{grp}_{t}'] = model
@@ -294,8 +301,12 @@ valid_y_int = np.array(valid_y['correct']).astype(int)
 # Compute prediction probabilities using best model
 y_pred_prob_best = models[best_model_key].predict(valid_x_scaled).flatten()
 
+
+# Ensure y_test is an array of integers
+true_int = np.array(true.values.reshape((-1))).astype(int)
+
 # Call the evaluation function
-evaluate_model(models[best_model_key], valid_x_scaled, valid_y_int, best_threshold)
+evaluate_model(oof.values.reshape((-1)), true_int, best_threshold)
 
 
 # PLOT THRESHOLD VS. F1_SCORE

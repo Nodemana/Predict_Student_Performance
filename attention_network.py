@@ -22,7 +22,7 @@ from keras import layers
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
+from sklearn.utils import class_weight
 from sklearn.metrics import f1_score, ConfusionMatrixDisplay, classification_report, confusion_matrix, accuracy_score, roc_auc_score
 
 import gc
@@ -121,7 +121,6 @@ def evaluate_model(model, X_test, y_test, threshold):
     print('ROC AUC score:', auc)
 
     # Print confusion matrix
-    fig = plt.figure(figsize=[25, 8])
     conf_matrix = confusion_matrix(y_test, y_pred)
     ConfusionMatrixDisplay(conf_matrix).plot()
     plt.title('Test Set Performance: %s' % (sum(y_pred == y_test)/len(y_test)))
@@ -191,7 +190,7 @@ event_var = ['navigate_click','person_click','cutscene_click','object_click','ma
             'map_click','observation_click','checkpoint','elapsed_time']
 
 df_tr = feature_engineer(train_df)
-
+print(df_tr.head(5))
 gc.collect()
 
 
@@ -231,6 +230,9 @@ for i, (train_index, test_index) in enumerate(gkf.split(X=df_tr, groups=df_tr.in
         train_users = train_x.index.values
         train_y = train_label.loc[train_label.q==t].set_index('session').loc[train_users]
         
+        class_weights = class_weight.compute_class_weight('balanced', np.unique(train_y), train_y)
+        class_weights = dict(enumerate(class_weights))
+
         # VALID DATA
         valid_x = df_tr.iloc[test_index]
         valid_x = valid_x.loc[valid_x.level_group == grp]
@@ -253,7 +255,7 @@ for i, (train_index, test_index) in enumerate(gkf.split(X=df_tr, groups=df_tr.in
 
 plot_history(history.history)
 #Saves the trained weights
-model.save_weights('Trained_Weights/Attention1')
+#model.save_weights('Trained_Weights/Attention1')
 #PUT TRUE LABELS INTO DATAFRAME WITH 18 COLUMNS
 true = oof.copy()
 for k in range(18):
