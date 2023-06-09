@@ -27,7 +27,6 @@ from sklearn.metrics import f1_score, ConfusionMatrixDisplay, classification_rep
 
 import gc
 
-
 # Reduce Memory Usage
 # reference : https://www.kaggle.com/code/arjanso/reducing-dataframe-memory-size-by-65 @ARJANGROEN
 
@@ -102,13 +101,7 @@ def feature_engineer(train):
     df = df.set_index('session_id')
     return df
 
-
-
-
-def evaluate_model(model, X_test, y_test, threshold):
-    # Compute prediction probabilities
-    y_pred_prob = model.predict(X_test).flatten()
-
+def evaluate_model(y_pred_prob, y_test, threshold):
     # Compute predicted classes
     y_pred = (y_pred_prob > threshold).astype(int)
 
@@ -123,8 +116,9 @@ def evaluate_model(model, X_test, y_test, threshold):
     # Print confusion matrix
     conf_matrix = confusion_matrix(y_test, y_pred)
     ConfusionMatrixDisplay(conf_matrix).plot()
+    plt.xlabel('Predicted Label',size=14)
+    plt.ylabel('True Label',size=14)
     plt.title('Test Set Performance: %s' % (sum(y_pred == y_test)/len(y_test)))
-
 
     # Print classification report
     print('Classification Report:')
@@ -267,7 +261,7 @@ for k in range(18):
 scores = []; thresholds = []
 best_score = 0; best_threshold = 0
 
-for threshold in np.arange(0.4,0.81,0.01):
+for threshold in np.arange(0.2,0.81,0.01):
     print(f'{threshold:.02f}, ',end='')
     preds = (oof.values.reshape((-1))>threshold).astype('int')
     m = f1_score(true.values.reshape((-1)), preds, average='macro')   
@@ -297,8 +291,11 @@ valid_y_int = np.array(valid_y['correct']).astype(int)
 # Compute prediction probabilities using best model
 y_pred_prob_best = models[best_model_key].predict(valid_x_scaled).flatten()
 
+# Ensure y_test is an array of integers
+true_int = np.array(true.values.reshape((-1))).astype(int)
+
 # Call the evaluation function
-evaluate_model(models[best_model_key], valid_x_scaled, valid_y_int, best_threshold)
+evaluate_model(oof.values.reshape((-1)), true_int, best_threshold)
 
 
 # PLOT THRESHOLD VS. F1_SCORE

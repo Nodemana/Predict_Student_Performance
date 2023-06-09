@@ -191,6 +191,8 @@ def evaluate_model(y_pred_prob, y_test, threshold):
     # Print confusion matrix
     conf_matrix = confusion_matrix(y_test, y_pred)
     ConfusionMatrixDisplay(conf_matrix).plot()
+    plt.xlabel('Predicted Label',size=14)
+    plt.ylabel('True Label',size=14)
     plt.title('Test Set Performance: %s' % (sum(y_pred == y_test)/len(y_test)))
 
     # Print classification report
@@ -246,18 +248,21 @@ for i, (train_index, test_index) in enumerate(gkf.split(X=df_tr, groups=df_tr.in
         scaler = StandardScaler()
         train_x_scaled = scaler.fit_transform(train_x[FEATURES].astype('float32'))
         valid_x_scaled = scaler.transform(valid_x[FEATURES].astype('float32'))
-        class_weights = [0.7, 0.3]
-        class_weights_dict = dict(enumerate(class_weights))
+        #class_weights = [0.7, 0.3]
+        #class_weights_dict = dict(enumerate(class_weights))
 
         # TRAIN MODEL
         model = create_model(train_x_scaled.shape[1])
+        model.load_weights('Trained_Weights/Model1')
         early_stopping = EarlyStopping(monitor='val_loss', patience=10)
-        model.fit(train_x_scaled, train_y['correct'], validation_data=(valid_x_scaled, valid_y['correct']), epochs=100, callbacks=[early_stopping], class_weight=class_weights_dict)
+        history = model.fit(train_x_scaled, train_y['correct'], validation_data=(valid_x_scaled, valid_y['correct']), epochs=15, callbacks=[early_stopping])
+        #history = model.fit(train_x_scaled, train_y['correct'], validation_data=(valid_x_scaled, valid_y['correct']), epochs=10, callbacks=[early_stopping], class_weight=class_weights_dict)
         
         # SAVE MODEL, PREDICT VALID OOF
         models[f'{grp}_{t}'] = model
         oof.loc[valid_users, t-1] = model.predict(valid_x_scaled).flatten()
 
+plot_history(history.history)
 #Saves the trained weights
 model.save_weights('Trained_Weights/Model1')
 #PUT TRUE LABELS INTO DATAFRAME WITH 18 COLUMNS
@@ -271,7 +276,7 @@ for k in range(18):
 scores = []; thresholds = []
 best_score = 0; best_threshold = 0
 
-for threshold in np.arange(0.4,0.81,0.01):
+for threshold in np.arange(0.35,0.91,0.005):
     print(f'{threshold:.02f}, ',end='')
     preds = (oof.values.reshape((-1))>threshold).astype('int')
     m = f1_score(true.values.reshape((-1)), preds, average='macro')   
